@@ -61,6 +61,16 @@ static u32 dma_busy_wait_threshold = 1<<15;
 module_param(dma_busy_wait_threshold, int, 0644);
 MODULE_PARM_DESC(dma_busy_wait_threshold, "Busy-wait for DMA completion below this area");
 
+#if __LINUX_ARM_ARCH__ >= 7
+/* Disable use of accelerated fb_copyarea for console scrolling by default on
+ * on Raspberry Pi 2. */
+static bool dma_scrolling = false;
+#else
+static bool dma_scrolling = true;
+#endif
+module_param(dma_scrolling, bool, 0644);
+MODULE_PARM_DESC(dma_scrolling, "Whether to use DMA copyarea for console text scrolling");
+
 /* this data structure describes each frame buffer device we find */
 
 struct fbinfo_s {
@@ -640,6 +650,8 @@ static int bcm2708_fb_register(struct bcm2708_fb *fb)
 	}
 	fb->fb.fbops = &bcm2708_fb_ops;
 	fb->fb.flags = FBINFO_FLAG_DEFAULT | FBINFO_HWACCEL_COPYAREA;
+	if (!dma_scrolling)
+		fb->fb.flags |= FBINFO_HWACCEL_DISABLED;
 	fb->fb.pseudo_palette = fb->cmap;
 
 	strncpy(fb->fb.fix.id, bcm2708_name, sizeof(fb->fb.fix.id));
