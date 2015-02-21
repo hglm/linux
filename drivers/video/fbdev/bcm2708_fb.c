@@ -639,7 +639,14 @@ static int bcm2708_fb_register(struct bcm2708_fb *fb)
 		fb->dma = dma;
 	}
 	fb->fb.fbops = &bcm2708_fb_ops;
+#if __LINUX_ARM_ARCH__ >= 7
+        /* Disable used of accelerated fb_copyarea for scrolling on
+         * on Raspberry Pi 2. */
+	fb->fb.flags = FBINFO_FLAG_DEFAULT | FBINFO_HWACCEL_COPYAREA |
+		FBINFO_HWACCEL_DISABLED;
+#else
 	fb->fb.flags = FBINFO_FLAG_DEFAULT | FBINFO_HWACCEL_COPYAREA;
+#endif
 	fb->fb.pseudo_palette = fb->cmap;
 
 	strncpy(fb->fb.fix.id, bcm2708_name, sizeof(fb->fb.fix.id));
