@@ -477,17 +477,17 @@ static void bcm2708_fb_copyarea(struct fb_info *info,
 	/* Fallback to cfb_copyarea() if we don't like something */
 	if (in_atomic() ||
 	    bytes_per_pixel > 4 ||
-	    info->var.xres * info->var.yres > 1920 * 1200 ||
+	    info->var.xres > 1920 ||
 	    region->width <= 0 || region->width > info->var.xres ||
-	    region->height <= 0 || region->height > info->var.yres ||
+	    region->height <= 0 || region->height > info->var.yres_virtual ||
 	    region->sx < 0 || region->sx >= info->var.xres ||
-	    region->sy < 0 || region->sy >= info->var.yres ||
+	    region->sy < 0 || region->sy >= info->var.yres_virtual ||
 	    region->dx < 0 || region->dx >= info->var.xres ||
-	    region->dy < 0 || region->dy >= info->var.yres ||
+	    region->dy < 0 || region->dy >= info->var.yres_virtual ||
 	    region->sx + region->width > info->var.xres ||
 	    region->dx + region->width > info->var.xres ||
-	    region->sy + region->height > info->var.yres ||
-	    region->dy + region->height > info->var.yres) {
+	    region->sy + region->height > info->var.yres_virtual ||
+	    region->dy + region->height > info->var.yres_virtual) {
 		cfb_copyarea(info, region);
 		return;
 	}
@@ -660,7 +660,7 @@ static int bcm2708_fb_register(struct bcm2708_fb *fb)
 	fb->fb.var.xres = fbwidth;
 	fb->fb.var.yres = fbheight;
 	fb->fb.var.xres_virtual = fbwidth;
-	fb->fb.var.yres_virtual = fbheight;
+	fb->fb.var.yres_virtual = fbheight * 3;
 	fb->fb.var.bits_per_pixel = fbdepth;
 	fb->fb.var.vmode = FB_VMODE_NONINTERLACED;
 	fb->fb.var.activate = FB_ACTIVATE_NOW;
