@@ -71,6 +71,11 @@ static bool dma_scrolling = true;
 module_param(dma_scrolling, bool, 0644);
 MODULE_PARM_DESC(dma_scrolling, "Whether to use DMA copyarea for console text scrolling");
 
+static bool triple_buffer = true;
+module_param(triple_buffer, bool, 0644);
+MODULE_PARM_DESC(triple_buffer, "Whether the framebuffer visible to applications it extended from "
+	"one to three screen pages");
+
 /* this data structure describes each frame buffer device we find */
 
 struct fbinfo_s {
@@ -487,17 +492,17 @@ static void bcm2708_fb_copyarea(struct fb_info *info,
 	/* Fallback to cfb_copyarea() if we don't like something */
 	if (in_atomic() ||
 	    bytes_per_pixel > 4 ||
-	    info->var.xres * info->var.yres > 1920 * 1200 ||
+	    info->var.xres_virtual * info->var.yres_virtual > 1920 * 3600 ||
 	    region->width <= 0 || region->width > info->var.xres ||
-	    region->height <= 0 || region->height > info->var.yres ||
+	    region->height <= 0 || region->height > info->var.yres_virtual ||
 	    region->sx < 0 || region->sx >= info->var.xres ||
-	    region->sy < 0 || region->sy >= info->var.yres ||
+	    region->sy < 0 || region->sy >= info->var.yres_virtual ||
 	    region->dx < 0 || region->dx >= info->var.xres ||
-	    region->dy < 0 || region->dy >= info->var.yres ||
+	    region->dy < 0 || region->dy >= info->var.yres_virtual ||
 	    region->sx + region->width > info->var.xres ||
 	    region->dx + region->width > info->var.xres ||
-	    region->sy + region->height > info->var.yres ||
-	    region->dy + region->height > info->var.yres) {
+	    region->sy + region->height > info->var.yres_virtual ||
+	    region->dy + region->height > info->var.yres_virtual) {
 		cfb_copyarea(info, region);
 		return;
 	}
@@ -511,12 +516,28 @@ static void bcm2708_fb_copyarea(struct fb_info *info,
 		 * the remaining 48K as the intermediate temporary scratch
 		 * buffer. The buffer size is sufficient to handle up to
 		 * 1920x1200 resolution at 32bpp pixel depth.
+ 		 *
+		 * When extending the area of operation to three screen pages
+		 * with a maximum virtual resolution of 1920x3600 at 32bpp,
+		 * the first part of the buffer has to be extended to 32K. In
+		 * case of a full region copy of 1920x3600, scanlines_per_cb
+		 * will be equal to floor(32768 / (1920 * 4)) = 4, resulting in
+		 * the generation of ceil(3600 / 4) = 900 control blocks. Since
+		 * the control block size is 32 bytes, the space taken in the
+		 * first part of the buffer will be 28800 bytes.
 		 */
 		int y;
 		dma_addr_t control_block_pa = fb->cb_handle;
-		dma_addr_t scratchbuf = fb->cb_handle + 16 * 1024;
+		dma_addr_t scratchbuf;
 		int scanline_size = bytes_per_pixel * region->width;
-		int scanlines_per_cb = (64 * 1024 - 16 * 1024) / scanline_size;
+		int scanlines_per_cb;
+		int cb_buffer_size;
+		if (pixels > 1920 * 1200)
+			cb_buffer_size = 16 * 1024;
+		else
+			cb_buffer_size = 32 * 1024;
+		scanlines_per_cb = (64 * 1024 - cb_buffer_size) / scanline_size;
+		scratchbuf = fb->cb_handle + cb_buffer_size;
 
 		for (y = 0; y < region->height; y += scanlines_per_cb) {
 			dma_addr_t src =
@@ -665,7 +686,10 @@ static int bcm2708_fb_register(struct bcm2708_fb *fb)
 	fb->fb.var.xres = fbwidth;
 	fb->fb.var.yres = fbheight;
 	fb->fb.var.xres_virtual = fbwidth;
-	fb->fb.var.yres_virtual = fbheight;
+	if (triple_buffer)
+		fb->fb.var.yres_virtual = fbheight * 3;
+	else
+		fb->fb.var.yres_virtual = fbheight;
 	fb->fb.var.bits_per_pixel = fbdepth;
 	fb->fb.var.vmode = FB_VMODE_NONINTERLACED;
 	fb->fb.var.activate = FB_ACTIVATE_NOW;
