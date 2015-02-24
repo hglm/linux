@@ -1090,10 +1090,10 @@ static int fb_copyarea_user(struct fb_info *info,
 	int ret = 0;
 	if (!lock_fb_info(info))
 		return -ENODEV;
-	if (copy->dx + copy->width > info->var.xres ||
-	    copy->sx + copy->width > info->var.xres ||
-	    copy->dy + copy->height > info->var.yres ||
-	    copy->sy + copy->height > info->var.yres) {
+	if (copy->dx + copy->width > info->var.xres_virtual ||
+	    copy->sx + copy->width > info->var.xres_virtual ||
+	    copy->dy + copy->height > info->var.yres_virtual ||
+	    copy->sy + copy->height > info->var.yres_virtual) {
 		ret = -EINVAL;
 		goto out;
 	}
